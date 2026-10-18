@@ -11,6 +11,7 @@ const required = [
   "index.html",
   "404.html",
   "posts/index.html",
+  "discover/index.html",
   "posts/rebuilding-blog-with-nextjs/index.html",
   "search/index.html",
   "rss.xml",

@@ -45,6 +45,26 @@ database_id = "真实的 database id"
 
 表结构见 [schema.sql](schema.sql)。未绑定 D1 时，统计接口返回 503，不会写入错误数据。
 
+## 发现页聚合
+
+聚合表位于同一个 `chasey-stats` D1：
+
+```bash
+pnpm exec wrangler d1 execute chasey-stats \
+  --remote \
+  --file=deploy/cloudflare/schema-content.sql
+```
+
+`workers/aggregator` 是独立 Cron Worker：
+
+```bash
+cd workers/aggregator
+pnpm install --ignore-scripts
+pnpm exec wrangler deploy
+```
+
+它每小时/每 2 小时抓取 `sources` 中启用的 RSS / JSON / HTML 源，只保存标题、链接、400 字摘要和来源。`/api/discover` 读取同一 D1。
+
 ## 部署
 
 ```bash

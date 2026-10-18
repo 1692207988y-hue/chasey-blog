@@ -96,6 +96,36 @@ pnpm exec wrangler d1 execute chasey-stats --remote --file=deploy/cloudflare/sch
 
 表结构见 [deploy/cloudflare/schema.sql](deploy/cloudflare/schema.sql)。
 
+
+## 发现页与自动聚合
+
+`/discover` 是独立的内容聚合页，不把外部全文搬进博客。
+
+- 数据表：复用 `chasey-stats` D1 中的 `sources / items / fetch_runs`
+- 抓取：`workers/aggregator` 独立 Worker，Cron `0 */2 * * *`
+- 只保存：标题、原文链接、最多 400 字摘要、作者、发布时间
+- 去重：canonical URL + `items.url_key UNIQUE`
+- 页面读取：`/api/discover` Pages Function → D1
+- 当前启用示例源：Hacker News RSS；可在 `sources` 表禁用或替换
+
+初始化内容表：
+
+```bash
+pnpm exec wrangler d1 execute chasey-stats \
+  --remote \
+  --file=deploy/cloudflare/schema-content.sql
+```
+
+部署 Worker：
+
+```bash
+cd workers/aggregator
+pnpm install --ignore-scripts
+pnpm exec wrangler deploy
+```
+
+Worker 详情见 [workers/aggregator/README.md](workers/aggregator/README.md)。
+
 ## 内容更新
 
 在 GitHub 网页打开 `content/posts/`：
