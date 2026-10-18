@@ -14,15 +14,22 @@ interface DiscoverRow {
   source_slug: string;
 }
 
+interface SourceRow {
+  slug: string;
+  name: string;
+  count: number;
+}
+
 export async function onRequestGet(context: {
   request: Request;
   env: Env;
 }) {
   const url = new URL(context.request.url);
   const limit = Math.min(
-    Math.max(Number(url.searchParams.get("limit")) || 20, 1),
-    50
+    Math.max(Number(url.searchParams.get("limit")) || 12, 1),
+    30
   );
+  const offset = Math.max(Number(url.searchParams.get("offset")) || 0, 0);
   const source = url.searchParams.get("source");
 
   const where = ["i.hidden = 0"];
@@ -32,9 +39,17 @@ export async function onRequestGet(context: {
     where.push("s.slug = ?");
     params.push(source);
   }
-  params.push(limit);
 
   try {
+    const totalRow = await context.env.STATS_DB.prepare(
+      `SELECT COUNT(*) AS total
+       FROM items i
+       JOIN sources s ON s.id = i.source_id
+       WHERE ${where.join(" AND ")}`
+    )
+      .bind(...params)
+      .first<{ total: number }>();
+
     const rows = await context.env.STATS_DB.prepare(
       `SELECT
          i.id, i.title, i.url, i.summary, i.author,
@@ -45,13 +60,29 @@ export async function onRequestGet(context: {
        JOIN sources s ON s.id = i.source_id
        WHERE ${where.join(" AND ")}
        ORDER BY COALESCE(i.published_at, i.first_seen_at) DESC
-       LIMIT ?`
+       LIMIT ? OFFSET ?`
     )
-      .bind(...params)
+      .bind(...params, limit, offset)
       .all<DiscoverRow>();
 
+    const sources = await context.env.STATS_DB.prepare(
+      `SELECT s.slug, s.name, COUNT(i.id) AS count
+       FROM sources s
+       LEFT JOIN items i ON i.source_id = s.id AND i.hidden = 0
+       WHERE s.enabled = 1
+       GROUP BY s.id
+       ORDER BY count DESC, s.name ASC`
+    ).all<SourceRow>();
+
+    const total = Number(totalRow?.total) || 0;
+
     return Response.json(
-      { items: rows.results },
+      {
+        items: rows.results,
+        sources: sources.results,
+        total,
+        hasMore: offset + rows.results.length < total
+      },
       {
         headers: {
           "cache-control": "public, max-age=300",
@@ -62,7 +93,7 @@ export async function onRequestGet(context: {
   } catch {
     // The page stays useful before the content migration runs.
     return Response.json(
-      { items: [], error: "aggregator_not_initialized" },
+      { items: [], sources: [], total: 0, hasMore: false, error: "aggregator_not_initialized" },
       {
         headers: {
           "cache-control": "no-store",

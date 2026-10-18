@@ -70,6 +70,23 @@ function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
+function cleanSummary(value: string): string {
+  return value
+    .replace(/Article URL:\s*\S+/gi, " ")
+    .replace(/Comments URL:\s*\S+/gi, " ")
+    .replace(/Points:\s*\d+/gi, " ")
+    .replace(/#\s*Comments:\s*\d+/gi, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeDate(value: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
 function canonicalUrl(raw: string, base?: string): string {
   const url = new URL(raw, base);
   if (url.protocol !== "https:" && url.protocol !== "http:") {
@@ -123,11 +140,11 @@ function parseRss(xml: string, source: Source): RawItem[] {
         url: link,
         title,
         summary: truncate(
-          stripHtml(text(entry.description) || text(entry["content:encoded"])),
+          cleanSummary(stripHtml(text(entry.description) || text(entry["content:encoded"]))),
           MAX_SUMMARY_LENGTH
         ),
         author: text(entry.author) || text(entry["dc:creator"]) || undefined,
-        publishedAt: text(entry.pubDate) || text(entry["dc:date"]) || undefined
+        publishedAt: normalizeDate(text(entry.pubDate) || text(entry["dc:date"]))
       });
     }
   }
@@ -155,11 +172,11 @@ function parseRss(xml: string, source: Source): RawItem[] {
         url: link,
         title,
         summary: truncate(
-          stripHtml(text(entry.summary) || text(entry.content)),
+          cleanSummary(stripHtml(text(entry.summary) || text(entry.content))),
           MAX_SUMMARY_LENGTH
         ),
         author: text((entry.author as Record<string, unknown> | undefined)?.name) || undefined,
-        publishedAt: text(entry.updated) || text(entry.published) || undefined
+        publishedAt: normalizeDate(text(entry.updated) || text(entry.published))
       });
     }
   }
@@ -189,11 +206,11 @@ async function parseJson(response: Response, source: Source): Promise<RawItem[]>
         url,
         title,
         summary: truncate(
-          stripHtml(String(pick(item, "summary") ?? "")),
+          cleanSummary(stripHtml(String(pick(item, "summary") ?? ""))),
           MAX_SUMMARY_LENGTH
         ),
         author: String(pick(item, "author") ?? "") || undefined,
-        publishedAt: String(pick(item, "date") ?? "") || undefined
+        publishedAt: normalizeDate(String(pick(item, "date") ?? ""))
       };
     })
     .filter((item) => item.title && item.url);
@@ -252,7 +269,7 @@ async function parseHtml(response: Response, source: Source): Promise<RawItem[]>
     .map((item) => ({
       ...item,
       title: truncate(item.title.trim(), 200),
-      summary: truncate(stripHtml(item.summary.trim()), MAX_SUMMARY_LENGTH)
+      summary: truncate(cleanSummary(stripHtml(item.summary.trim())), MAX_SUMMARY_LENGTH)
     }))
     .filter((item) => item.title && item.url);
 }
