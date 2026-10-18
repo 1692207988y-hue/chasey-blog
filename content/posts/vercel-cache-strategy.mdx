@@ -1,0 +1,74 @@
+---
+title: "Vercel 上的缓存策略：让静态博客既快又新"
+description: "从内容哈希、ISR 到 HTML 缓存头，整理一套适合个人博客的缓存与自动刷新方案。"
+date: "2026-10-14"
+category: "工程"
+tags: ["Vercel", "缓存", "性能", "SEO"]
+featured: true
+cover: "signal"
+---
+
+博客的缓存目标很矛盾：静态资源要缓存得越久越好，HTML 却希望用户每次都能看到最新内容。
+
+## 两类资源，两种策略
+
+### 带内容哈希的静态资源
+
+Next.js 构建后会为 JS、CSS 等资源生成内容哈希文件名：
+
+```txt
+/_next/static/chunks/9d8f2a3b.js
+```
+
+文件名变了，内容才变。所以可以放心使用一年缓存：
+
+```http
+Cache-Control: public, max-age=31536000, immutable
+```
+
+### HTML 页面
+
+文章更新后，用户不应该刷新三次才看到新内容。因此 HTML 使用：
+
+```http
+Cache-Control: public, max-age=0, must-revalidate
+```
+
+结合 ISR 或按需 `revalidatePath`，可以在“静态速度”和“内容新鲜”之间取得平衡。
+
+## 什么时候触发重新验证
+
+这个博客有三类更新来源：
+
+| 来源 | 触发方式 | 频率 |
+| --- | --- | --- |
+| 新文章 | `git push` → Vercel 构建 | 手动 |
+| 每日数据 | Vercel Cron → `/api/cron/refresh` | 每天 |
+| 仓库状态 | 每小时 ISR | 自动 |
+
+```ts
+export async function GET(request: Request) {
+  const auth = request.headers.get("authorization");
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return Response.json({ ok: false }, { status: 401 });
+  }
+
+  revalidatePath("/");
+  revalidatePath("/archive");
+  return Response.json({ ok: true });
+}
+```
+
+## 不要缓存“用户相关”的响应
+
+点赞和阅读统计必须返回 `Cache-Control: no-store`，否则同一个 CDN 节点会把一个人的阅读数发给所有人。
+
+```ts
+return Response.json(stats, {
+  headers: { "Cache-Control": "no-store" }
+});
+```
+
+## 总结
+
+缓存不是“加一个 max-age”，而是明确哪些东西可以共享、哪些必须私有、哪些需要主动失效。想清楚这三件事，博客的性能和内容体验就不会互相打架。

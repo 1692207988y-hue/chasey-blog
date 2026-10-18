@@ -1,0 +1,43 @@
+services:
+  app:
+    image: ${APP_IMAGE:-chasey-blog:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://chasey.top}
+        NEXT_PUBLIC_SITE_NAME: ${NEXT_PUBLIC_SITE_NAME:-Chasey}
+        NEXT_PUBLIC_GISCUS_REPO: ${NEXT_PUBLIC_GISCUS_REPO:-}
+        NEXT_PUBLIC_GISCUS_REPO_ID: ${NEXT_PUBLIC_GISCUS_REPO_ID:-}
+        NEXT_PUBLIC_GISCUS_CATEGORY: ${NEXT_PUBLIC_GISCUS_CATEGORY:-Announcements}
+        NEXT_PUBLIC_GISCUS_CATEGORY_ID: ${NEXT_PUBLIC_GISCUS_CATEGORY_ID:-}
+        NEXT_PUBLIC_GITHUB_URL: ${NEXT_PUBLIC_GITHUB_URL:-https://github.com/}
+    env_file:
+      - .env.production
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:

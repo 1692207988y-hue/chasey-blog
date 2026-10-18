@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily refresh for Chasey blog (03:15 Asia/Shanghai)
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

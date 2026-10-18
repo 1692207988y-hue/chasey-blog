@@ -1,0 +1,85 @@
+---
+title: "把个人网站重构成 Next.js 博客：一次面向长期维护的选择"
+description: "从手写静态站到 Next.js App Router，记录这次重构的取舍：内容、性能、部署与可以持续十年的写作系统。"
+date: "2026-10-18"
+updated: "2026-10-18"
+category: "工程"
+tags: ["Next.js", "TypeScript", "Vercel", "重构"]
+pinned: true
+featured: true
+cover: "aurora"
+---
+
+写博客最难的部分通常不是把第一篇写出来，而是让第一百篇仍然容易发布。
+
+这个网站最早是手写 HTML、CSS 和原生 JavaScript。它足够轻，也足够自由；但当文章、标签、搜索、评论和统计一起出现时，继续用拼接脚本维护会变成一种负担。于是我把内容层迁移到 Next.js App Router，把“写作”和“页面”分开。
+
+## 为什么是 Next.js
+
+我需要的东西并不复杂：
+
+- 用 MDX 写文章，代码块、标题锚点和图片都能直接使用。
+- 构建时把文章静态化，首屏不依赖客户端 JavaScript。
+- 需要动态的部分——点赞、阅读数、评论——只在客户端按需加载。
+- SEO 元数据、RSS、sitemap 和结构化数据都在服务端生成。
+
+Next.js 的 App Router 让这些边界比较清楚。文章页是服务器组件，统计和评论是小的客户端岛屿，不会为了一个点赞按钮把整篇文章变成 SPA。
+
+```ts
+// 文章页只在服务端读取文件系统，构建后就是静态 HTML
+const post = getPostBySlug(params.slug);
+
+if (!post) notFound();
+
+return (
+  <article>
+    <h1>{post.title}</h1>
+    <MDXRemote source={post.content} components={mdxComponents} />
+  </article>
+);
+```
+
+## 内容目录就是数据库
+
+文章放在 `content/posts`，每篇一个 `.mdx` 文件。frontmatter 只保留真正需要索引的字段：
+
+```yaml
+---
+title: "把个人网站重构成 Next.js 博客"
+date: "2026-10-18"
+category: "工程"
+tags: ["Next.js", "TypeScript"]
+pinned: true
+cover: "aurora"
+---
+```
+
+这样做有几个直接好处：
+
+1. Git 历史就是内容历史，回滚文章和回滚代码没有区别。
+2. 构建时可以做全文检索索引，不需要外部搜索服务。
+3. 备份简单，迁移简单，换框架也不会丢失正文。
+
+## 性能是设计的一部分
+
+博客的性能不该靠“少放几张图”来维持，而应该靠架构默认值：
+
+- 静态资源使用内容哈希命名，长缓存。
+- HTML 使用短缓存，保证发布后立即更新。
+- 图片使用浏览器原生懒加载，并预留宽高。
+- 字体使用系统中文字体栈，避免首屏等待外部字体。
+
+```ts
+export const metadata = {
+  alternates: { canonical: "/posts/rebuilding-blog-with-nextjs" },
+  openGraph: { type: "article" }
+};
+```
+
+## 关于“自动更新”
+
+每天凌晨，Vercel Cron 会请求一次 `/api/cron/refresh`，重新验证首页和归档页，并更新每日一言与 GitHub 仓库状态。内容本身仍然来自 Git；自动化只负责让页面上的“活的”信息保持新鲜。
+
+> 好的个人博客不是一台上线即完成的机器，而是一套允许你持续写作的秩序。
+
+下一步，我准备把评论换成更适合中文网络环境的方案，并继续优化移动端的阅读体验。

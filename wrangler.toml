@@ -1,0 +1,10 @@
+name = "chasey-blog"
+pages_build_output_dir = "out"
+compatibility_date = "2026-10-18"
+
+# 在 Cloudflare Dashboard → Workers & Pages → KV 创建命名空间后，
+# 将真实 id 填入下方，并在 Pages 项目的 Settings → Functions → KV bindings 绑定 STATS_KV。
+# 创建 KV 命名空间后取消注释并填入真实 id：
+[[kv_namespaces]]
+binding = "STATS_KV"
+id = "36529c477ea24bafbc7b54bc9a515cc0"

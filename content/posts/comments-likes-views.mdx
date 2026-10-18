@@ -1,0 +1,69 @@
+---
+title: "给个人博客加上评论、点赞和阅读量"
+description: "静态博客也可以有完整的互动层：Giscus 评论、Vercel KV 计数，以及不打扰阅读的加载方式。"
+date: "2026-10-12"
+category: "工程"
+tags: ["Giscus", "Vercel KV", "评论", "互动"]
+featured: false
+cover: "paper"
+---
+
+纯静态博客最容易被问到的问题是：“为什么不能评论？”
+
+答案是可以，只是需要把动态部分拆出去。我的做法是：
+
+- 评论交给 Giscus，基于 GitHub Discussions。
+- 点赞和阅读量交给 Vercel KV。
+- 所有互动组件延后加载，不阻塞文章正文。
+
+## 评论：把数据交给可信的服务
+
+Giscus 的优点是部署简单、数据归属清晰、支持 GitHub 登录。配置只需要一个 repo 和对应的 Discussion 分类。
+
+```html
+<script
+  src="https://giscus.app/client.js"
+  data-repo="your-name/chasey-blog"
+  data-repo-id="R_xxx"
+  data-category="Announcements"
+  data-category-id="DIC_xxx"
+  data-mapping="pathname"
+  data-lang="zh-CN"
+  data-theme="preferred_color_scheme"
+  data-loading="lazy"
+></script>
+```
+
+如果访客无法访问 GitHub，评论区会显示加载失败。这是第三方服务带来的现实限制，而不是博客本身的问题。对于面向国内读者的站点，后续可以替换成自托管 Waline，并把评论数据放在境内服务上。
+
+## 点赞与阅读数
+
+统计服务只做两件事：
+
+```ts
+await kv.hincrby(key, "views", 1);
+await kv.hincrby(key, "likes", 1);
+```
+
+前端在文章加载后请求一次，阅读量每个会话只记一次，点赞状态保存在本地。
+
+```ts
+useEffect(() => {
+  if (sessionStorage.getItem(`viewed:${slug}`)) return;
+  sessionStorage.setItem(`viewed:${slug}`, "1");
+  fetch(`/api/stats/${slug}`, { method: "POST", body: JSON.stringify({ action: "view" }) });
+}, [slug]);
+```
+
+## 互动的边界
+
+我刻意没有做这些事：
+
+- 不显示实时在线人数。
+- 不做排行榜。
+- 不把评论数量当成文章质量的指标。
+- 不在正文加载前请求统计接口。
+
+博客的核心仍然是阅读。互动应该像门铃，而不是广告牌。
+
+> 一个安静的阅读页面，比一个热闹但打断阅读的页面更难做。
