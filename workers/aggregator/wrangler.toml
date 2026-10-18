@@ -1,0 +1,12 @@
+name = "chasey-aggregator"
+main = "src/index.ts"
+compatibility_date = "2026-10-18"
+
+# 复用现有 chasey-stats D1，避免再维护一个数据库。
+[[d1_databases]]
+binding = "STATS_DB"
+database_name = "chasey-stats"
+database_id = "37391f33-44af-4534-aecb-2ab787b40f5e"
+
+[triggers]
+crons = ["0 */2 * * *"]

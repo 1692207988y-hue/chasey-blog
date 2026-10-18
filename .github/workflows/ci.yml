@@ -27,5 +27,12 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm typecheck
       - run: pnpm typecheck:functions
+
+      - name: Typecheck aggregator Worker
+        working-directory: workers/aggregator
+        run: |
+          pnpm install --ignore-scripts
+          pnpm exec tsc --noEmit
+
       - run: pnpm build:cloudflare
       - run: pnpm check:static

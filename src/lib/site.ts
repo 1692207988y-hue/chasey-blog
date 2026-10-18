@@ -22,6 +22,7 @@ export const siteConfig = {
 export const navItems = [
   { href: "/", label: "首页" },
   { href: "/posts", label: "文章" },
+  { href: "/discover", label: "发现" },
   { href: "/archive", label: "归档" },
   { href: "/categories", label: "分类" },
   { href: "/tags", label: "标签" },
