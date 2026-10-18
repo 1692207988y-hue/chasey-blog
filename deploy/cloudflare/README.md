@@ -1,45 +1,40 @@
 # Cloudflare Pages 部署手册
 
-当前工程已支持 **Cloudflare Pages 静态导出 + Pages Functions + D1**：
+当前架构：
 
-- 页面：`next build` 静态导出到 `out/`
-- 点赞 / 阅读：`functions/api/stats/[slug].ts` + Cloudflare D1
-- 搜索：构建时索引，纯客户端 Fuse.js
-- 评论：Giscus
-- 每日更新：GitHub Actions schedule 重新构建并部署
-- 缓存：`_headers` 中配置 `_next/static` 一年 immutable
+```text
+GitHub main
+  → GitHub Actions（构建 / 校验）
+  → Cloudflare Pages（静态 out/ + Pages Functions + D1）
+  → https://blog.chasey.top
+```
 
-## ⚠️ ICP 说明
+`https://chasey.top` 是原 Netlify 个人站，保持不变，不在此项目中部署。
 
-**Cloudflare Pages 不能用于中国大陆 ICP 备案。**  
-如果网站需要 ICP 备案号与境内接入，必须回到阿里云/腾讯云等境内节点；Cloudflare Pages 只适合海外访问、个人预览或不要求 ICP 的站点。
-
-## 1. 本地构建
+## 本地构建
 
 ```bash
 pnpm install --ignore-scripts
+pnpm typecheck
+pnpm typecheck:functions
 pnpm build:cloudflare
+pnpm check:static
 ```
 
-产物在 `out/`。构建脚本会临时移出 `src/app/api`（静态导出不支持 Next API Routes），构建完成后自动恢复。
+产物在 `out/`。`build:cloudflare` 只做 Next.js 静态导出；API 由 `functions/` 中的 Pages Functions 提供，不再移动 `src/app/api`。
 
-## 2. 创建 Cloudflare 资源
+## Cloudflare 资源
 
-登录 Cloudflare：
+如需从零创建：
 
 ```bash
 pnpm exec wrangler login
-```
-
-创建 Pages 项目和 KV：
-
-```bash
 pnpm exec wrangler pages project create chasey-blog --production-branch main
 pnpm exec wrangler d1 create chasey-stats
 pnpm exec wrangler d1 execute chasey-stats --remote --file=deploy/cloudflare/schema.sql
 ```
 
-把返回的 database id 填入 `wrangler.toml`：
+`wrangler.toml` 需要绑定：
 
 ```toml
 [[d1_databases]]
@@ -48,93 +43,105 @@ database_name = "chasey-stats"
 database_id = "真实的 database id"
 ```
 
-D1 表结构见 [schema.sql](schema.sql)。
+表结构见 [schema.sql](schema.sql)。未绑定 D1 时，统计接口返回 503，不会写入错误数据。
 
-> 未绑定 D1 时，统计接口返回 503，不会写入错误数据。
-
-## 3. 部署
+## 部署
 
 ```bash
 pnpm exec wrangler pages deploy out --project-name=chasey-blog
 ```
 
-首次部署会得到：
+首次部署得到 `https://chasey-blog.pages.dev`。当前自定义域名已经绑定为 `https://blog.chasey.top`。
 
-```text
-https://chasey-blog.pages.dev
-```
+## 自定义域名
 
-当前已绑定自定义域名：`https://blog.chasey.top`。`chasey.top` 原站保持不变。
-
-## 4. 自定义域名
+**只操作博客子域名 `blog.chasey.top`，不要给 `chasey.top` 建 A/CNAME 或替换原站。**
 
 在 Cloudflare Dashboard：
 
-**Workers & Pages → chasey-blog → Custom domains → Set up a custom domain**
+```text
+Workers & Pages → chasey-blog → Custom domains
+→ 添加 blog.chasey.top
+```
 
-添加 `chasey.top` 和 `www.chasey.top`。
+当前 DNS 在 Netlify DNS：
 
-如果域名当前使用 Netlify DNS（`chasey.top` 当前解析到 75.2.60.5），需要二选一：
+```text
+blog.chasey.top  CNAME  chasey-blog.pages.dev
+```
 
-1. 把 DNS 托管迁移到 Cloudflare（推荐，apex 域名可直接绑定）；
-2. 或按 Cloudflare 提示添加 CNAME / 调整 DNS；apex 域名可能需要 CNAME flattening。
+`chasey.top` 仍指向原 Netlify 站点。若迁移 DNS，必须单独确认，不能影响 apex。
 
-> 自定义域名与 DNS 修改需要 Cloudflare 账号权限；没有凭据无法从代码侧完成。
-
-## 5. GitHub Actions 自动部署
+## GitHub Actions
 
 工作流：`.github/workflows/deploy-cloudflare.yml`
 
-在 GitHub Repository Secrets 配置：
+Repository Secrets：
 
 ```text
-CLOUDFLARE_API_TOKEN       # 需要 Pages:Edit、Workers KV:Edit 权限
+CLOUDFLARE_API_TOKEN   # Pages Edit、D1 Edit（若仍使用 KV，再加 Workers KV Edit）
 CLOUDFLARE_ACCOUNT_ID
 ```
 
-在 Repository Variables 可选配置：
+Repository Variables（可选，构建时注入）：
 
 ```text
-CLOUDFLARE_PROJECT_NAME=chasey-blog
+NEXT_PUBLIC_SITE_NAME
+NEXT_PUBLIC_SITE_DESCRIPTION
+NEXT_PUBLIC_GISCUS_REPO
+NEXT_PUBLIC_GISCUS_REPO_ID
+NEXT_PUBLIC_GISCUS_CATEGORY
+NEXT_PUBLIC_GISCUS_CATEGORY_ID
+NEXT_PUBLIC_GITHUB_URL
 ```
 
-push `main` 后会自动：
+`NEXT_PUBLIC_*` 是构建时变量，只在 Cloudflare Dashboard 配置不会进入 GitHub Actions 构建。
 
-1. `pnpm build:cloudflare`
-2. 创建/检查 Pages 项目
-3. `wrangler pages deploy out`
+工作流在 `main` push 后：
 
-工作流还带每日 schedule（北京时间 03:20），会重新构建以刷新每日一言、GitHub 状态等构建时数据。
+1. 安装依赖
+2. `pnpm typecheck` / `pnpm typecheck:functions`
+3. `pnpm build:cloudflare`
+4. `pnpm check:static`
+5. `wrangler pages deploy out`
 
-## 6. 与 Vercel / 阿里云方案的差异
+每日北京时间 03:20 还会定时重建，刷新每日一言、GitHub 状态等构建时数据。
 
-| 能力 | Cloudflare Pages | 阿里云 ECS |
-| --- | --- | --- |
-| ICP 备案 | ❌ 不支持 | ✅ 可备案 |
-| 静态页面 | ✅ | ✅ |
-| 点赞/阅读 | Pages Functions + D1 | Node API + Redis |
-| 服务端 ISR | ❌ 静态导出 | ✅ |
-| 自动更新 | GitHub Actions 定时重建 | systemd timer + 重新构建 |
-| 中国大陆访问 | 可能不稳定 | 低延迟 |
+## 负载与缓存
 
-## 7. 常见问题
+| 内容 | 策略 |
+| --- | --- |
+| `/_next/static/*` | 一年 immutable |
+| HTML | `max-age=0, must-revalidate` |
+| RSS / sitemap | 1 小时 |
+| `/api/*` | no-store |
+| `*.pages.dev` | noindex |
 
-### 构建输出
+安全头：nosniff、Referrer-Policy、X-Frame-Options、Permissions-Policy、HSTS、CSP。
 
-`pnpm build:cloudflare` 只做 Next.js 静态导出，API 由 `functions/` 中的 Pages Functions 提供。
+## 常见问题
 
-### 点赞/阅读接口返回 503
+### 统计接口 503
 
-检查：
+- 检查 `wrangler.toml` 的 D1 id；
+- 执行过 `schema.sql`；
+- `/api/stats/<slug>` 返回 200。
 
-- `wrangler.toml` 中 D1 database id 是否正确；
-- 是否执行过 `schema.sql`；
-- 浏览器请求 `/api/stats/<slug>` 是否返回 200。
+### 评论不显示
+
+Giscus 需要：
+
+1. **公开** GitHub 仓库
+2. 开启 GitHub Discussions
+3. 安装 Giscus App
+4. 把 repo-id / category-id 配成 GitHub Repository Variables
+
+当前仓库为私有，因此评论仍是占位状态。
 
 ### 每日一言不更新
 
-静态导出没有 ISR。需要在 GitHub Actions 中启用 schedule，或手动重新运行 `deploy-cloudflare.yml`。
+静态导出没有 ISR；依赖 GitHub Actions 的每日 schedule 或手动重跑 workflow。
 
-### Giscus 无法加载
+### ICP
 
-Giscus 依赖 GitHub；国内网络可能不稳定。对国内读者建议换自托管 Waline，或使用阿里云方案。
+Cloudflare Pages 不能用于中国大陆 ICP 备案。需要备案时必须使用境内节点。
