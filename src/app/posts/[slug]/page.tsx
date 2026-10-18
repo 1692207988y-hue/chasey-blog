@@ -22,7 +22,6 @@ import { formatDate, tagHref } from "@/lib/utils";
 import { postJsonLd } from "@/lib/jsonld";
 import { absoluteUrl } from "@/lib/site";
 
-export const revalidate = 3600;
 export const dynamicParams = false;
 
 export function generateStaticParams() {

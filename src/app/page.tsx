@@ -2,11 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { PostCard, CoverArt } from "@/components/post-card";
 import { PopularPosts } from "@/components/popular-posts";
-import { getFeaturedPosts, getLatestPosts, getPinnedPosts, getAllCategories } from "@/lib/posts";
+import { getLatestPosts, getPinnedPosts, getAllCategories } from "@/lib/posts";
 import { getDailyQuote, getGitHubStats } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
-
-export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: { absolute: "Chasey · 个人博客" },
@@ -17,7 +15,6 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const [quote, github] = await Promise.all([getDailyQuote(), getGitHubStats()]);
   const pinned = getPinnedPosts()[0];
-  const featured = getFeaturedPosts(3);
   const latest = getLatestPosts(7).filter((post) => post.slug !== pinned?.slug).slice(0, 6);
   const categories = getAllCategories();
 
@@ -73,7 +70,7 @@ export default async function HomePage() {
               </div>
             </div>
             <PopularPosts
-              fallback={getFeaturedPosts(4).map((post) => ({
+              fallback={getLatestPosts(100).map((post) => ({
                 slug: post.slug,
                 title: post.title,
                 category: post.category,

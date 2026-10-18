@@ -1,4 +1,4 @@
-import { absoluteUrl, siteConfig } from "@/lib/site";
+import { absoluteUrl, pageUrl, siteConfig } from "@/lib/site";
 import type { PostMeta } from "@/lib/posts";
 
 export function websiteJsonLd() {
@@ -41,10 +41,11 @@ export function postJsonLd(post: PostMeta) {
     datePublished: post.date,
     dateModified: post.updated || post.date,
     inLanguage: "zh-CN",
-    mainEntityOfPage: absoluteUrl(`/posts/${post.slug}`),
-    url: absoluteUrl(`/posts/${post.slug}`),
+    mainEntityOfPage: pageUrl(`/posts/${post.slug}`),
+    url: pageUrl(`/posts/${post.slug}`),
     articleSection: post.category,
     keywords: post.tags,
+    image: absoluteUrl("/og.png"),
     author: {
       "@type": "Person",
       name: siteConfig.name,

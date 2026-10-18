@@ -1,9 +1,9 @@
 # Cloudflare Pages 部署手册
 
-当前工程已支持 **Cloudflare Pages 静态导出 + Pages Functions**：
+当前工程已支持 **Cloudflare Pages 静态导出 + Pages Functions + D1**：
 
 - 页面：`next build` 静态导出到 `out/`
-- 点赞 / 阅读：`functions/api/stats/[slug].ts` + Cloudflare KV
+- 点赞 / 阅读：`functions/api/stats/[slug].ts` + Cloudflare D1
 - 搜索：构建时索引，纯客户端 Fuse.js
 - 评论：Giscus
 - 每日更新：GitHub Actions schedule 重新构建并部署
@@ -35,20 +35,22 @@ pnpm exec wrangler login
 
 ```bash
 pnpm exec wrangler pages project create chasey-blog --production-branch main
-pnpm exec wrangler kv namespace create STATS_KV
+pnpm exec wrangler d1 create chasey-stats
+pnpm exec wrangler d1 execute chasey-stats --remote --file=deploy/cloudflare/schema.sql
 ```
 
-把返回的 KV namespace id 填入 `wrangler.toml`：
+把返回的 database id 填入 `wrangler.toml`：
 
 ```toml
-[[kv_namespaces]]
-binding = "STATS_KV"
-id = "真实的 namespace id"
+[[d1_databases]]
+binding = "STATS_DB"
+database_name = "chasey-stats"
+database_id = "真实的 database id"
 ```
 
-也可以在 Cloudflare Dashboard → Workers & Pages → KV 创建，并在 Pages 项目的 Functions → KV bindings 里绑定 `STATS_KV`。
+D1 表结构见 [schema.sql](schema.sql)。
 
-> 未绑定 KV 时，点赞/阅读会使用 Pages Function 进程内存 fallback，仅适合本地预览，刷新/重建后清零。
+> 未绑定 D1 时，统计接口返回 503，不会写入错误数据。
 
 ## 3. 部署
 
@@ -110,23 +112,23 @@ push `main` 后会自动：
 | --- | --- | --- |
 | ICP 备案 | ❌ 不支持 | ✅ 可备案 |
 | 静态页面 | ✅ | ✅ |
-| 点赞/阅读 | Pages Functions + KV | Node API + Redis |
+| 点赞/阅读 | Pages Functions + D1 | Node API + Redis |
 | 服务端 ISR | ❌ 静态导出 | ✅ |
 | 自动更新 | GitHub Actions 定时重建 | systemd timer + 重新构建 |
 | 中国大陆访问 | 可能不稳定 | 低延迟 |
 
 ## 7. 常见问题
 
-### `src/app/api` 构建报错
+### 构建输出
 
-Cloudflare 静态导出不支持 API Routes。使用 `pnpm build:cloudflare`，不要直接 `next build`；脚本会临时移出 API。
+`pnpm build:cloudflare` 只做 Next.js 静态导出，API 由 `functions/` 中的 Pages Functions 提供。
 
-### 点赞一直返回 0
+### 点赞/阅读接口返回 503
 
 检查：
 
-- `wrangler.toml` 中 KV namespace id 是否已替换；
-- Pages 项目的 Functions → KV bindings 是否绑定 `STATS_KV`；
+- `wrangler.toml` 中 D1 database id 是否正确；
+- 是否执行过 `schema.sql`；
 - 浏览器请求 `/api/stats/<slug>` 是否返回 200。
 
 ### 每日一言不更新

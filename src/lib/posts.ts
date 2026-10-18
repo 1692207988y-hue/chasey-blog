@@ -51,10 +51,20 @@ export interface TocItem {
 
 const POSTS_DIR = path.join(process.cwd(), "content", "posts");
 const COVER_VARIANTS: CoverVariant[] = ["aurora", "nebula", "orbit", "paper", "signal", "sunset"];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function normalizeTags(tags: unknown): string[] {
   if (!Array.isArray(tags)) return [];
-  return tags.map((tag) => String(tag).trim()).filter(Boolean);
+  return [...new Set(tags.map((tag) => String(tag).trim()).filter(Boolean))];
+}
+
+function isDraft(fileName: string) {
+  try {
+    const raw = fs.readFileSync(path.join(POSTS_DIR, fileName), "utf8");
+    return Boolean((matter(raw).data as PostFrontmatter).draft);
+  } catch {
+    return false;
+  }
 }
 
 function countWords(text: string) {
@@ -71,8 +81,11 @@ function readPostFile(fileName: string): Post {
   const raw = fs.readFileSync(path.join(POSTS_DIR, fileName), "utf8");
   const { data, content } = matter(raw);
   const frontmatter = data as PostFrontmatter;
-  if (!frontmatter.title || !frontmatter.date) {
-    throw new Error(`文章 ${fileName} 缺少 title 或 date`);
+  if (typeof frontmatter.title !== "string" || !frontmatter.title.trim()) {
+    throw new Error(`文章 ${fileName} 缺少 title`);
+  }
+  if (typeof frontmatter.date !== "string" || !DATE_RE.test(frontmatter.date)) {
+    throw new Error(`文章 ${fileName} 的 date 必须是 YYYY-MM-DD`);
   }
   const words = countWords(content);
   const slug = fileName.replace(/\.mdx?$/, "");
@@ -86,7 +99,10 @@ function readPostFile(fileName: string): Post {
     description: frontmatter.description || "",
     date: frontmatter.date,
     updated: frontmatter.updated,
-    category: frontmatter.category || "随笔",
+    category:
+      typeof frontmatter.category === "string" && frontmatter.category.trim()
+        ? frontmatter.category.trim()
+        : "随笔",
     tags: normalizeTags(frontmatter.tags),
     pinned: Boolean(frontmatter.pinned),
     featured: Boolean(frontmatter.featured),
@@ -105,11 +121,8 @@ export function getAllPosts(): Post[] {
   const posts = fs
     .readdirSync(POSTS_DIR)
     .filter((file) => /\.mdx?$/.test(file))
+    .filter((file) => !isDraft(file))
     .map(readPostFile)
-    .filter((post) => {
-      const raw = matter(fs.readFileSync(path.join(POSTS_DIR, `${post.slug}.mdx`), "utf8")).data;
-      return !raw.draft;
-    })
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   postCache = posts;
   return posts;
@@ -194,9 +207,15 @@ export function getAdjacentPosts(slug: string) {
 
 export function extractToc(markdown: string): TocItem[] {
   const slugger = new GithubSlugger();
+  let inFence = false;
   return markdown
     .split("\n")
     .map((line) => {
+      if (/^\s*```/.test(line)) {
+        inFence = !inFence;
+        return null;
+      }
+      if (inFence) return null;
       const match = /^(#{2,4})\s+(.+?)\s*$/.exec(line);
       if (!match) return null;
       const level = match[1].length;

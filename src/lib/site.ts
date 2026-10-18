@@ -29,6 +29,14 @@ export const navItems = [
   { href: "/links", label: "友链" }
 ];
 
+export function pageUrl(path = "/") {
+  const url = new URL(path, `${siteConfig.url}/`);
+  if (!url.pathname.endsWith("/")) url.pathname += "/";
+  url.hash = "";
+  url.search = "";
+  return url.toString();
+}
+
 export function absoluteUrl(path = "/") {
   return `${siteConfig.url}${path.startsWith("/") ? path : `/${path}`}`;
 }

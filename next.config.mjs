@@ -1,10 +1,8 @@
 /** @type {import('next').NextConfig} */
-const standalone = process.env.BUILD_STANDALONE === "true";
 const cloudflare = process.env.BUILD_CLOUDFLARE === "true";
 
 const nextConfig = {
   reactStrictMode: true,
-  ...(standalone ? { output: "standalone" } : {}),
   ...(cloudflare ? { output: "export", trailingSlash: true } : {}),
   poweredByHeader: false,
   compress: true,

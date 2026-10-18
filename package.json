@@ -8,26 +8,26 @@
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:functions": "tsc -p tsconfig.functions.json --noEmit",
+    "check:static": "node scripts/check-static.mjs"
   },
   "dependencies": {
-    "@vercel/kv": "^3.0.0",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
     "fuse.js": "^7.0.0",
-    "ioredis": "^5.4.2",
     "github-slugger": "^2.0.0",
     "gray-matter": "^4.0.3",
     "next": "14.2.35",
     "next-mdx-remote": "^5.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "rehype-autolink-headings": "^7.1.0",
     "rehype-highlight": "^7.0.2",
     "rehype-slug": "^6.0.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261016.1",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",

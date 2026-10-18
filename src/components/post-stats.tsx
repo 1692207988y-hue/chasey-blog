@@ -13,6 +13,22 @@ function formatCount(value: number) {
   return String(value);
 }
 
+function getVisitorId() {
+  const key = "chasey:visitor-id";
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing && /^[A-Za-z0-9_-]{8,80}$/.test(existing)) return existing;
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    return `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
+
 export function PostStats({ slug }: { slug: string }) {
   const [stats, setStats] = useState<Stats>({ views: 0, likes: 0 });
   const [liked, setLiked] = useState(false);
@@ -31,7 +47,9 @@ export function PostStats({ slug }: { slug: string }) {
         const res = await fetch(`/api/stats/${encodeURIComponent(slug)}`, {
           method: viewed ? "GET" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: viewed ? undefined : JSON.stringify({ action: "view" }),
+          body: viewed
+            ? undefined
+            : JSON.stringify({ action: "view", visitor: getVisitorId() }),
           cache: "no-store"
         });
         if (!res.ok) return;
@@ -56,7 +74,7 @@ export function PostStats({ slug }: { slug: string }) {
       const res = await fetch(`/api/stats/${encodeURIComponent(slug)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action })
+        body: JSON.stringify({ action, visitor: getVisitorId() })
       });
       if (res.ok) {
         const data = (await res.json()) as Stats;

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 interface PopularPost {
   slug: string;
@@ -11,8 +12,39 @@ interface PopularPost {
   likes: number;
 }
 
+interface PopularStat {
+  slug: string;
+  views: number;
+  likes: number;
+}
+
 export function PopularPosts({ fallback }: { fallback: PopularPost[] }) {
-  const posts = fallback;
+  const [posts, setPosts] = useState<PopularPost[]>(fallback.slice(0, 4));
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/popular", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: PopularStat[] | null) => {
+        if (cancelled || !Array.isArray(data) || !data.length) return;
+        const bySlug = new Map(fallback.map((post) => [post.slug, post]));
+        const ranked = data
+          .map((stat) => {
+            const post = bySlug.get(stat.slug);
+            return post ? { ...post, views: stat.views, likes: stat.likes } : null;
+          })
+          .filter(Boolean) as PopularPost[];
+        const seen = new Set(ranked.map((post) => post.slug));
+        const rest = fallback.filter((post) => !seen.has(post.slug));
+        setPosts([...ranked, ...rest].slice(0, 4));
+      })
+      .catch(() => {
+        /* keep curated fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fallback]);
 
   return (
     <div className="rounded-[24px] border border-line/12 bg-surface/45 p-5">

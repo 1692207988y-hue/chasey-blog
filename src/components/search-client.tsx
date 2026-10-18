@@ -43,6 +43,14 @@ export function SearchClient({ documents, initialQuery = "" }: SearchClientProps
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const trimmed = query.trim();
+    if (trimmed) url.searchParams.set("q", trimmed);
+    else url.searchParams.delete("q");
+    window.history.replaceState(null, "", url);
+  }, [query]);
+
   return (
     <div>
       <div className="relative">

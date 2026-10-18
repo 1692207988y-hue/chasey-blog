@@ -1,5 +1,5 @@
 import { getAllPosts } from "@/lib/posts";
-import { siteConfig } from "@/lib/site";
+import { pageUrl, siteConfig } from "@/lib/site";
 
 export const dynamic = "force-static";
 
@@ -18,8 +18,8 @@ export function GET() {
     .map(
       (post) => `    <item>
       <title>${escapeXml(post.title)}</title>
-      <link>${siteConfig.url}/posts/${post.slug}</link>
-      <guid isPermaLink="true">${siteConfig.url}/posts/${post.slug}</guid>
+      <link>${pageUrl(`/posts/${post.slug}`)}</link>
+      <guid isPermaLink="true">${pageUrl(`/posts/${post.slug}`)}</guid>
       <description>${escapeXml(post.description)}</description>
       <pubDate>${new Date(`${post.date}T00:00:00+08:00`).toUTCString()}</pubDate>
       ${post.tags.map((tag) => `<category>${escapeXml(tag)}</category>`).join("\n      ")}
