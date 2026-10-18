@@ -14,6 +14,39 @@
 
 现有静态站点保留在 `../personal-site`，本目录是独立的博客工程，不会覆盖旧站。上线时可以选择把 `chasey.top` 指向这个项目，或先部署到独立子域名验证。
 
+
+## 更新文章（不需要本地环境）
+
+1. 打开 GitHub 仓库：<https://github.com/1692207988y-hue/chasey-blog>
+2. 进入 `content/posts`
+3. 点 `Add file` → `Create new file`
+4. 文件名写成英文短横线形式，例如 `my-new-post.mdx`
+5. 粘贴：
+
+```mdx
+---
+title: "文章标题"
+description: "一句话摘要"
+date: "2026-10-18"
+category: "随笔"
+tags: ["生活"]
+---
+
+正文第一段。
+
+## 小标题
+
+正文第二段。
+```
+
+6. 点 `Commit changes`
+7. Cloudflare Pages 会自动构建，约 1–3 分钟后上线：
+   `https://blog.chasey.top/posts/my-new-post/`
+
+修改文章：打开对应 `.mdx` → 铅笔图标 → 修改 → Commit。  
+删除文章：打开对应 `.mdx` → 垃圾桶 → Commit。  
+图片：上传到 `public/images/`，文章中写 `![说明](/images/文件名.jpg)`。
+
 ## 技术栈
 
 - Next.js 14.2（App Router、Server Components；Cloudflare 使用静态导出，API 改由 Pages Functions 提供）
