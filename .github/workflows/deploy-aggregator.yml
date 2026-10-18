@@ -28,6 +28,12 @@ jobs:
         with:
           node-version: 22
 
+      - name: Normalize Cloudflare token
+        run: |
+          TOKEN="${CLOUDFLARE_API_TOKEN#$'\xEF\xBB\xBF'}"
+          echo "::add-mask::$TOKEN"
+          echo "CLOUDFLARE_API_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
       - name: Apply content schema
         run: pnpm dlx wrangler@4.151.1 d1 execute chasey-stats --remote --file=deploy/cloudflare/schema-content.sql
 
